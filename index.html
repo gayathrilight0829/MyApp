@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StellarStudy // Premium Personal Study Tracker</title>
+    <!-- Modern Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Background Ambient Glows -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+    <div class="ambient-glow glow-3"></div>
+
+    <!-- SECURITY LOGIN OVERLAY -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-glass-card">
+            <div class="login-header">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="glow-svg"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                </div>
+                <h2>StellarStudy</h2>
+                <p>Enter credentials to access your command deck</p>
+            </div>
+            
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">Study Space ID</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" class="input-icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                        <input type="text" id="username" autocomplete="username" placeholder="Enter ID" required>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="password">Access Phrase</label>
+                    <div class="input-wrapper">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" class="input-icon"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <input type="password" id="password" autocomplete="current-password" placeholder="Enter password" required>
+                    </div>
+                </div>
+                <div id="login-error" class="login-error-message hidden">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    Invalid ID or password. Try again.
+                </div>
+                <button type="submit" class="btn btn-primary btn-login">
+                    Authenticate
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP STRUCTURE -->
+    <div id="app-container" class="app-container hidden-app">
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-header">
+                <div class="logo-wrapper">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="sidebar-logo-svg"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                    <span class="logo-text">StellarStudy</span>
+                </div>
+                <div class="user-badge-mini">
+                    <div class="avatar-glow"></div>
+                    <span class="user-name-label">Gayathri</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <button class="nav-item active" data-tab="home">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    <span>Dashboard</span>
+                    <div class="nav-active-bar"></div>
+                </button>
+                <button class="nav-item" data-tab="calendar">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    <span>Calendar & Log</span>
+                    <div class="nav-active-bar"></div>
+                </button>
+                <button class="nav-item" data-tab="resources">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                    <span>Resources & Todos</span>
+                    <div class="nav-active-bar"></div>
+                </button>
+                <button class="nav-item" data-tab="files">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <span>File Vault</span>
+                    <div class="nav-active-bar"></div>
+                </button>
+                <button class="nav-item" data-tab="mocktest">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span>Mock Tests</span>
+                    <div class="nav-active-bar"></div>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn btn-logout">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    <span>Secure Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="app-main">
+            <!-- Header bar -->
+            <header class="app-header">
+                <div class="header-welcome">
+                    <h1 id="welcome-message">Stellar Deck</h1>
+                    <p class="subtitle" id="current-date-display">Stellar Deck System Status Active</p>
+                </div>
+                <div class="header-actions">
+                    <div id="quick-streak" class="header-badge">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" class="flame-icon"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
+                        <span><strong id="streak-count">0</strong> Day Streak</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB 1: HOME PAGE -->
+            <section id="tab-home" class="tab-content active">
+                <!-- Top Overview Grid -->
+                <div class="dashboard-grid">
+                    <!-- Progress Card -->
+                    <div class="glass-card progress-overview-card">
+                        <div class="card-header">
+                            <h3>Overall Completion</h3>
+                            <span class="badge badge-accent" id="overall-percentage-badge">0%</span>
+                        </div>
+                        <div class="overall-progress-container">
+                            <div class="circle-progress-wrapper">
+                                <svg class="progress-ring-svg" width="140" height="140">
+                                    <circle class="progress-ring-bg" cx="70" cy="70" r="58"></circle>
+                                    <circle class="progress-ring-fill" id="overall-ring-fill" cx="70" cy="70" r="58" stroke-dasharray="364.4" stroke-dashoffset="364.4"></circle>
+                                </svg>
+                                <div class="progress-percentage-label">
+                                    <span id="overall-progress-text">0</span><span class="percent-sign">%</span>
+                                </div>
+                            </div>
+                            <div class="progress-breakdown-summary">
+                                <div class="summary-metric">
+                                    <span class="label">Topics Logged</span>
+                                    <span class="value" id="total-study-sessions">0 Sessions</span>
+                                </div>
+                                <div class="summary-metric">
+                                    <span class="label">Active Categories</span>
+                                    <span class="value">6 / 6 Loaded</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quote Card -->
+                    <div class="glass-card quote-card">
+                        <div class="quote-ambient"></div>
+                        <div class="card-header">
+                            <h3>System Core Motivation</h3>
+                            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" class="pulse-icon"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                        </div>
+                        <div class="quote-content-wrapper">
+                            <p class="quote-text" id="motivation-quote">"The only way to learn a new programming language is by writing programs in it."</p>
+                            <span class="quote-author" id="motivation-author">— Dennis Ritchie</span>
+                        </div>
+                        <button id="btn-next-quote" class="btn btn-secondary btn-mini">
+                            <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                            Refresh Quote
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Subject Category Grid -->
+                <h2 class="section-title">Knowledge Metrics</h2>
+                <div class="subjects-progress-grid">
+                    <!-- DSA -->
+                    <div class="glass-card subject-card" data-subject="dsa">
+                        <div class="subject-icon-bg dsa-accent">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></svg>
+                        </div>
+                        <div class="subject-info">
+                            <h4>DSA</h4>
+                            <span class="subject-desc">Algorithms & Complexities</span>
+                            <div class="subject-progress-bar-wrapper">
+                                <div class="progress-bar-bg"><div class="progress-bar-fill dsa-accent-bg" id="dsa-progress-bar" style="width: 0%"></div></div>
+                                <span class="progress-numeric" id="dsa-progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- AI -->
+                    <div class="glass-card subject-card" data-subject="ai">
+                        <div class="subject-icon-bg ai-accent">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        </div>
+                        <div class="subject-info">
+                            <h4>Artificial Intelligence</h4>
+                            <span class="subject-desc">Models & Neural Architectures</span>
+                            <div class="subject-progress-bar-wrapper">
+                                <div class="progress-bar-bg"><div class="progress-bar-fill ai-accent-bg" id="ai-progress-bar" style="width: 0%"></div></div>
+                                <span class="progress-numeric" id="ai-progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Aptitude -->
+                    <div class="glass-card subject-card" data-subject="apti">
+                        <div class="subject-icon-bg apti-accent">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        </div>
+                        <div class="subject-info">
+                            <h4>Aptitude</h4>
+                            <span class="subject-desc">Logic & Quantitative Reasoning</span>
+                            <div class="subject-progress-bar-wrapper">
+                                <div class="progress-bar-bg"><div class="progress-bar-fill apti-accent-bg" id="apti-progress-bar" style="width: 0%"></div></div>
+                                <span class="progress-numeric" id="apti-progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- System Design -->
+                    <div class="glass-card subject-card" data-subject="systemdesign">
+                        <div class="subject-icon-bg systemdesign-accent">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+                        </div>
+                        <div class="subject-info">
+                            <h4>System Design</h4>
+                            <span class="subject-desc">Scaling, Sharding, & Architecture</span>
+                            <div class="subject-progress-bar-wrapper">
+                                <div class="progress-bar-bg"><div class="progress-bar-fill systemdesign-accent-bg" id="systemdesign-progress-bar" style="width: 0%"></div></div>
+                                <span class="progress-numeric" id="systemdesign-progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Technology -->
+                    <div class="glass-card subject-card" data-subject="tech">
+                        <div class="subject-icon-bg tech-accent">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline><line x1="12" y1="2" x2="12" y2="22"></line></svg>
+                        </div>
+                        <div class="subject-info">
+                            <h4>Technology</h4>
+                            <span class="subject-desc">Frameworks, Tools & Cloud</span>
+                            <div class="subject-progress-bar-wrapper">
+                                <div class="progress-bar-bg"><div class="progress-bar-fill tech-accent-bg" id="tech-progress-bar" style="width: 0%"></div></div>
+                                <span class="progress-numeric" id="tech-progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Core IT -->
+                    <div class="glass-card subject-card" data-subject="core">
+                        <div class="subject-icon-bg core-accent">
+                            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2.5" fill="none"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                        </div>
+                        <div class="subject-info">
+                            <h4>Core IT</h4>
+                            <span class="subject-desc">OS, DBMS, Networks & Security</span>
+                            <div class="subject-progress-bar-wrapper">
+                                <div class="progress-bar-bg"><div class="progress-bar-fill core-accent-bg" id="core-progress-bar" style="width: 0%"></div></div>
+                                <span class="progress-numeric" id="core-progress-text">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activity Log & Deadlines -->
+                <div class="dashboard-secondary-grid">
+                    <!-- Left: Upcoming Deadlines -->
+                    <div class="glass-card timeline-card">
+                        <div class="card-header">
+                            <h3>Upcoming Events & Deadlines</h3>
+                            <span class="badge" id="upcoming-events-count">0 Event(s)</span>
+                        </div>
+                        <div class="upcoming-deadlines-list" id="home-upcoming-events">
+                            <!-- Populated by JS -->
+                            <div class="empty-state">
+                                <p>No upcoming events or deadlines scheduled.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Right: Recent Activity Log -->
+                    <div class="glass-card timeline-card">
+                        <div class="card-header">
+                            <h3>Recent Logs</h3>
+                        </div>
+                        <div class="recent-logs-list" id="home-recent-logs">
+                            <!-- Populated by JS -->
+                            <div class="empty-state">
+                                <p>No logs found. Head over to Calendar tab to log your study sessions!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: CALENDAR PAGE -->
+            <section id="tab-calendar" class="tab-content">
+                <div class="tab-sub-navigation">
+                    <button class="sub-nav-item active" id="btn-calendar-month">Monthly Calendar</button>
+                    <button class="sub-nav-item" id="btn-calendar-day">Day Study Logger</button>
+                </div>
+
+                <!-- Sub-tab 1: Monthly Calendar Grid -->
+                <div id="calendar-month-view" class="calendar-subview">
+                    <div class="calendar-grid-layout">
+                        <!-- Calendar Widget Panel -->
+                        <div class="glass-card calendar-outer-panel">
+                            <div class="calendar-header-panel">
+                                <button class="btn btn-secondary btn-icon-only" id="prev-month">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                                </button>
+                                <h3 id="calendar-month-year-label">June 2026</h3>
+                                <button class="btn btn-secondary btn-icon-only" id="next-month">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </button>
+                            </div>
+
+                            <div class="calendar-days-header">
+                                <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                            </div>
+                            <div class="calendar-days-grid" id="calendar-days-grid">
+                                <!-- Populated dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Calendar Event Configurator Panel -->
+                        <div class="glass-card event-creator-panel">
+                            <div class="panel-header-sticky">
+                                <h3 id="calendar-selected-date-title">Select a date</h3>
+                                <p class="small-text text-muted" id="calendar-selected-date-subtitle">Click on a grid date to configure deadlines</p>
+                            </div>
+                            
+                            <!-- Date-specific details and logging summary -->
+                            <div class="event-details-area">
+                                <h4 class="mini-title">Logs for Selected Day</h4>
+                                <div id="day-study-summary" class="day-study-summary">
+                                    <div class="empty-state">
+                                        <p>No study logs for this date.</p>
+                                    </div>
+                                </div>
+
+                                <div class="separator-line"></div>
+
+                                <h4 class="mini-title">Scheduled Deadlines</h4>
+                                <div id="day-events-list" class="day-events-list">
+                                    <div class="empty-state">
+                                        <p>No deadlines set for this date.</p>
+                                    </div>
+                                </div>
+
+                                <!-- Add New Event/Deadline Form -->
+                                <form id="add-event-form" class="add-event-form disabled-form">
+                                    <input type="hidden" id="event-date-field">
+                                    <div class="input-group">
+                                        <label for="event-title">New Event/Deadline Title</label>
+                                        <input type="text" id="event-title" placeholder="e.g. System Design Mock Test" disabled required>
+                                    </div>
+                                    <div class="input-row">
+                                        <div class="input-group">
+                                            <label for="event-time">Time</label>
+                                            <input type="time" id="event-time" disabled required>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="event-type">Type</label>
+                                            <select id="event-type" disabled required>
+                                                <option value="deadline">Deadline</option>
+                                                <option value="milestone">Milestone</option>
+                                                <option value="test">Mock Test</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button type="submit" id="event-submit-btn" class="btn btn-primary btn-full" disabled>
+                                        Save Event
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sub-tab 2: Day Study Logger -->
+                <div id="calendar-day-view" class="calendar-subview hidden-subview">
+                    <div class="logger-layout">
+                        <!-- Left Panel: Log Form -->
+                        <div class="glass-card logger-form-panel">
+                            <h3>Log Daily Progress</h3>
+                            <p class="section-desc">Record hours spent and details of topics learned to increment your progress tracker.</p>
+                            
+                            <form id="study-logger-form">
+                                <div class="input-row">
+                                    <div class="input-group">
+                                        <label for="log-date">Logging Date</label>
+                                        <input type="date" id="log-date" required>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="log-category">Subject Category</label>
+                                        <select id="log-category" required>
+                                            <option value="" disabled selected>Select Category</option>
+                                            <option value="dsa">DSA</option>
+                                            <option value="ai">AI</option>
+                                            <option value="apti">Aptitude</option>
+                                            <option value="systemdesign">System Design</option>
+                                            <option value="tech">Technology</option>
+                                            <option value="core">Core IT</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="input-row">
+                                    <div class="input-group">
+                                        <label for="log-duration">Duration (Hours)</label>
+                                        <input type="number" id="log-duration" min="0.5" max="24" step="0.5" placeholder="e.g. 2.5" required>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="log-percentage">Topics Completion Increment (%)</label>
+                                        <input type="number" id="log-percentage" min="1" max="100" placeholder="e.g. 5" required>
+                                        <span class="helper-text">Increments subjects' overall completion progress</span>
+                                    </div>
+                                </div>
+
+                                <div class="input-group">
+                                    <label for="log-description">What did you learn?</label>
+                                    <textarea id="log-description" rows="4" placeholder="Detail the concepts, algorithms, frameworks, or problems solved..." required></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary">
+                                    Submit Session Log
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- Right Panel: History of logs -->
+                        <div class="glass-card logger-history-panel">
+                            <div class="panel-header-sticky">
+                                <h3>Historical Log Registry</h3>
+                                <p class="section-desc">Audit trail of all study logs generated on Stellar Deck</p>
+                            </div>
+                            <div class="logs-table-container" id="study-logs-table-container">
+                                <!-- Populated dynamically by JS -->
+                                <table class="study-logs-table" id="study-logs-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Category</th>
+                                            <th>Time spent</th>
+                                            <th>Progress</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="study-logs-tbody">
+                                        <!-- Populated dynamically -->
+                                    </tbody>
+                                </table>
+                                <div class="empty-state" id="study-logs-empty">
+                                    <p>No study hours logged yet. Record your first session using the form.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: RESOURCES & TODO PAGE -->
+            <section id="tab-resources" class="tab-content">
+                <div class="resources-layout-grid">
+                    <!-- Column 1: Bookmarks / Resource Vault -->
+                    <div class="glass-card resource-vault-card">
+                        <div class="card-header">
+                            <div>
+                                <h3>Study Resource Vault</h3>
+                                <p class="section-desc">A unified container to store references, documentation, tutorials, and roadmap links.</p>
+                            </div>
+                            <button id="btn-open-add-resource" class="btn btn-primary btn-mini">
+                                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Add Resource
+                            </button>
+                        </div>
+
+                        <!-- Add Resource Form Drawer (hidden by default) -->
+                        <div id="add-resource-panel" class="inline-drawer hidden-element">
+                            <form id="add-resource-form">
+                                <div class="input-row">
+                                    <div class="input-group">
+                                        <label for="resource-name">Resource Name</label>
+                                        <input type="text" id="resource-name" placeholder="e.g. NeetCode 150 List" required>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="resource-category">Category</label>
+                                        <select id="resource-category" required>
+                                            <option value="" disabled selected>Select Category</option>
+                                            <option value="dsa">DSA</option>
+                                            <option value="ai">AI</option>
+                                            <option value="apti">Aptitude</option>
+                                            <option value="systemdesign">System Design</option>
+                                            <option value="tech">Technology</option>
+                                            <option value="core">Core IT</option>
+                                            <option value="misc">Miscellaneous</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label for="resource-url">Resource URL</label>
+                                    <input type="url" id="resource-url" placeholder="https://example.com/roadmap" required>
+                                </div>
+                                <div class="drawer-actions">
+                                    <button type="submit" class="btn btn-primary">Save Reference</button>
+                                    <button type="button" id="btn-cancel-resource" class="btn btn-secondary">Cancel</button>
+                                </div>
+                            </form>
+                            <div class="separator-line"></div>
+                        </div>
+
+                        <!-- Category Filters -->
+                        <div class="resource-filters">
+                            <button class="filter-chip active" data-filter="all">All</button>
+                            <button class="filter-chip" data-filter="dsa">DSA</button>
+                            <button class="filter-chip" data-filter="ai">AI</button>
+                            <button class="filter-chip" data-filter="apti">Aptitude</button>
+                            <button class="filter-chip" data-filter="systemdesign">System Design</button>
+                            <button class="filter-chip" data-filter="tech">Tech</button>
+                            <button class="filter-chip" data-filter="core">Core IT</button>
+                        </div>
+
+                        <div class="resources-vault-container" id="resources-vault-list">
+                            <!-- Populated dynamically by JS -->
+                            <div class="empty-state">
+                                <p>No study resource links added. Click 'Add Resource' to insert yours!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Advanced Todo checklist -->
+                    <div class="glass-card todo-vault-card">
+                        <div class="card-header">
+                            <div>
+                                <h3>Target Milestones Todo</h3>
+                                <p class="section-desc">Track tasks, mock dates, and general study objectives.</p>
+                            </div>
+                        </div>
+
+                        <!-- Add Todo form -->
+                        <form id="add-todo-form" class="add-todo-inline">
+                            <input type="text" id="todo-text" placeholder="Write standard milestone or chore..." required>
+                            <select id="todo-priority" required>
+                                <option value="low">Low Priority</option>
+                                <option value="medium" selected>Medium Priority</option>
+                                <option value="high">High Priority</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary btn-icon-only">
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            </button>
+                        </form>
+
+                        <div class="todo-filters-bar">
+                            <div class="todo-stats-mini">
+                                <span id="todo-counts-display">0 active items</span>
+                            </div>
+                            <button id="btn-clear-completed-todo" class="btn btn-secondary btn-mini">
+                                Clear Completed
+                            </button>
+                        </div>
+
+                        <!-- Todos list box -->
+                        <div class="todos-list-scroller" id="todos-list-container">
+                            <!-- Populated dynamically by JS -->
+                            <div class="empty-state">
+                                <p>All milestones reached! Add a new task above.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: FILES PAGE -->
+            <section id="tab-files" class="tab-content">
+                <div class="files-grid-layout">
+                    <!-- Left Column: File Dropzone & Vault Upload -->
+                    <div class="glass-card file-upload-card">
+                        <h3>Study Vault Document Storage</h3>
+                        <p class="section-desc">Store study materials, mock papers, Excel syllabus guides, and reference eBooks directly in the Stellar Space local sandbox (IndexedDB protected).</p>
+
+                        <!-- Visual Dropzone -->
+                        <div class="file-dropzone" id="file-dropzone">
+                            <input type="file" id="real-file-input" accept=".pdf, .xls, .xlsx, .epub, .mobi, .txt, .csv, application/pdf, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple hidden>
+                            <div class="dropzone-content">
+                                <svg viewBox="0 0 24 24" width="48" height="48" stroke="currentColor" stroke-width="1.5" fill="none" class="pulse-icon-slow"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                <h4>Drop your Study Documents here</h4>
+                                <p class="small-text">Supports PDF, Excel (.xls, .xlsx), eBooks (.epub, .txt)</p>
+                                <button type="button" id="btn-trigger-upload" class="btn btn-primary btn-mini">Select Files</button>
+                            </div>
+                        </div>
+
+                        <!-- Upload progress bars if any -->
+                        <div id="upload-status-indicator" class="upload-status-indicator hidden-element">
+                            <span class="small-text" id="upload-status-filename">Uploading document...</span>
+                            <div class="progress-bar-bg"><div class="progress-bar-fill dsa-accent-bg" id="upload-status-bar" style="width: 0%"></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Stored Documents Register -->
+                    <div class="glass-card file-vault-register">
+                        <div class="card-header">
+                            <div>
+                                <h3>Secure Stored Documents</h3>
+                                <p class="section-desc">Locally cached, sandboxed files available for download offline.</p>
+                            </div>
+                            <span class="badge badge-accent" id="storage-utilization-badge">0 Bytes</span>
+                        </div>
+
+                        <div class="files-category-selector">
+                            <button class="filter-chip active" data-file-filter="all">All Documents</button>
+                            <button class="filter-chip" data-file-filter="pdf">PDFs</button>
+                            <button class="filter-chip" data-file-filter="excel">Excel Sheets</button>
+                            <button class="filter-chip" data-file-filter="ebook">eBooks & Reading</button>
+                        </div>
+
+                        <div class="files-list-scroller" id="files-vault-list">
+                            <!-- Populated dynamically by JS -->
+                            <div class="empty-state">
+                                <p>Your document vault is currently empty. Upload files in the dropzone.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: MOCK TEST & TIMER PAGE -->
+            <section id="tab-mocktest" class="tab-content">
+                <div class="mocktest-grid-layout">
+                    <!-- Left Column: Test & Timer Panel -->
+                    <div class="glass-card timer-canvas-card">
+                        <div class="timer-section-header">
+                            <h3>Test Chronometer</h3>
+                            <p class="section-desc">Simulate strict mock test scenarios with custom parameters and audio alerts.</p>
+                        </div>
+
+                        <div class="timer-display-panel">
+                            <!-- Circular Timer Container -->
+                            <div class="circular-timer-wrapper">
+                                <svg class="timer-ring-svg" width="220" height="220">
+                                    <circle class="timer-ring-bg" cx="110" cy="110" r="98"></circle>
+                                    <circle class="timer-ring-fill" id="timer-ring-fill" cx="110" cy="110" r="98" stroke-dasharray="615.75" stroke-dashoffset="0"></circle>
+                                </svg>
+                                <div class="timer-clock-digits" id="timer-display">45:00</div>
+                                <span class="timer-status-subtitle" id="timer-status-indicator">STANDBY</span>
+                            </div>
+
+                            <!-- Timer Preset Shortcuts -->
+                            <div class="timer-presets" id="timer-presets-row">
+                                <button class="btn btn-secondary btn-mini" data-preset="900">15 Mins</button>
+                                <button class="btn btn-secondary btn-mini active-preset" data-preset="1800">30 Mins</button>
+                                <button class="btn btn-secondary btn-mini" data-preset="2700">45 Mins</button>
+                                <button class="btn btn-secondary btn-mini" data-preset="3600">60 Mins</button>
+                            </div>
+                        </div>
+
+                        <!-- Timer Controls -->
+                        <div class="timer-actions-row">
+                            <button id="btn-timer-start-pause" class="btn btn-primary btn-timer-primary">
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" id="icon-start-pause"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                                <span id="label-start-pause">Initiate Test Session</span>
+                            </button>
+                            <button id="btn-timer-reset" class="btn btn-secondary btn-icon-only">
+                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Coding Test Configurator & History -->
+                    <div class="glass-card mocktest-config-card">
+                        <h3>Coding Session Logger</h3>
+                        <p class="section-desc">Record results, accuracy, and concepts evaluated during coding challenges.</p>
+
+                        <!-- Log Completed Mock Test Form -->
+                        <form id="mock-test-log-form" class="mocktest-logger-form">
+                            <div class="input-row">
+                                <div class="input-group">
+                                    <label for="test-title">Test / Problem Title</label>
+                                    <input type="text" id="test-title" placeholder="e.g. LeetCode Biweekly Contest 120" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="test-category">Subject Area</label>
+                                    <select id="test-category" required>
+                                        <option value="dsa" selected>DSA</option>
+                                        <option value="ai">AI</option>
+                                        <option value="apti">Aptitude</option>
+                                        <option value="systemdesign">System Design</option>
+                                        <option value="tech">Technology</option>
+                                        <option value="core">Core IT</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="input-row">
+                                <div class="input-group">
+                                    <label for="test-problems-solved">Problems Solved / Questions Answered</label>
+                                    <input type="number" id="test-problems-solved" min="0" placeholder="e.g. 3" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="test-problems-total">Total Problems / Questions</label>
+                                    <input type="number" id="test-problems-total" min="1" placeholder="e.g. 4" required>
+                                </div>
+                            </div>
+
+                            <div class="input-row">
+                                <div class="input-group">
+                                    <label for="test-duration-logged">Duration Spent (Minutes)</label>
+                                    <input type="number" id="test-duration-logged" min="1" placeholder="e.g. 45" required>
+                                </div>
+                                <div class="input-group">
+                                    <label for="test-score">Score / Efficiency (%)</label>
+                                    <input type="number" id="test-score" min="0" max="100" placeholder="e.g. 75" required>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-full">
+                                Log Test Record
+                            </button>
+                        </form>
+
+                        <div class="separator-line"></div>
+
+                        <!-- Test History Log Table -->
+                        <h3>Evaluation History Registry</h3>
+                        <div class="test-history-scroller" id="test-history-container">
+                            <table class="test-history-table" id="test-history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Title</th>
+                                        <th>Category</th>
+                                        <th>Duration</th>
+                                        <th>Solved</th>
+                                        <th>Score</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="test-history-tbody">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                            <div class="empty-state" id="test-history-empty">
+                                <p>No completed coding tests recorded. Log your first challenge above!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Main JavaScript Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
