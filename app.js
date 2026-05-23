@@ -103,6 +103,7 @@ function initAuth() {
     const loginForm = document.getElementById("login-form");
     const loginError = document.getElementById("login-error");
     const logoutBtn = document.getElementById("btn-logout");
+    const logoutMobileBtn = document.getElementById("btn-logout-mobile");
 
     // Check if session token exists
     const isAuthenticated = sessionStorage.getItem(SESSION_KEY) === "true" || localStorage.getItem(SESSION_KEY) === "true";
@@ -140,7 +141,7 @@ function initAuth() {
         }
     });
 
-    logoutBtn.addEventListener("click", () => {
+    const handleLogout = () => {
         sessionStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(SESSION_KEY);
         appContainer.classList.add("hidden-app");
@@ -149,7 +150,10 @@ function initAuth() {
         // Clear login form fields
         document.getElementById("username").value = "";
         document.getElementById("password").value = "";
-    });
+    };
+
+    if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
+    if (logoutMobileBtn) logoutMobileBtn.addEventListener("click", handleLogout);
 }
 
 function updateWelcomeHeader() {
