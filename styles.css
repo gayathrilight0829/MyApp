@@ -1926,7 +1926,7 @@ a:hover {
 .mocktest-config-card {
     display: flex;
     flex-direction: column;
-    max-height: 580px;
+    max-height: none;
 }
 
 .mocktest-logger-form {
@@ -1937,7 +1937,7 @@ a:hover {
 }
 
 .test-history-scroller {
-    flex-grow: 1;
+    height: 240px;
     overflow-y: auto;
     border: 1px solid var(--border-light);
     border-radius: 12px;
