@@ -229,34 +229,12 @@ function saveCoreData() {
 
 function initDefaultStore() {
     state = {
-        progress: { dsa: 15, ai: 10, apti: 20, systemdesign: 5, tech: 25, core: 30 },
-        logs: [
-            { id: 1, date: getOffsetDateString(0), category: "dsa", duration: 2.5, description: "Solved 3 Medium Binary Tree problems on DFS.", percentageIncrement: 5 },
-            { id: 2, date: getOffsetDateString(-1), category: "ai", duration: 3, description: "Studied Backpropagation algorithm and coded simple Neural Network layer.", percentageIncrement: 10 },
-            { id: 3, date: getOffsetDateString(-2), category: "systemdesign", duration: 1.5, description: "Reviewed Key-Value store architectures and Consistency models.", percentageIncrement: 5 },
-            { id: 4, date: getOffsetDateString(-3), category: "dsa", duration: 3.5, description: "Practiced sliding window algorithms and key Array patterns.", percentageIncrement: 10 },
-            { id: 5, date: getOffsetDateString(-4), category: "apti", duration: 2, description: "Solved 15 Quantitative Reasoning questions on Work & Time.", percentageIncrement: 20 },
-            { id: 6, date: getOffsetDateString(-5), category: "tech", duration: 4, description: "Finished reading Next.js App Router and Server Components docs.", percentageIncrement: 25 },
-            { id: 7, date: getOffsetDateString(-6), category: "core", duration: 3, description: "Reviewed OS CPU scheduling algorithms and Semaphores.", percentageIncrement: 30 }
-        ],
-        events: [
-            { id: 1, date: getOffsetDateString(1), time: "14:00", title: "DSA Contest Practice", type: "test" },
-            { id: 2, date: getOffsetDateString(3), time: "09:00", title: "System Design Milestone Study", type: "milestone" },
-            { id: 3, date: getOffsetDateString(5), time: "23:59", title: "Aptitude Section Test Deadline", type: "deadline" }
-        ],
-        resources: [
-            { id: 1, name: "NeetCode 150 Map", category: "dsa", url: "https://neetcode.io/practice" },
-            { id: 2, name: "CS229 Stanford AI", category: "ai", url: "https://cs229.stanford.edu" },
-            { id: 3, name: "System Design Primer", category: "systemdesign", url: "https://github.com/donnemartin/system-design-primer" }
-        ],
-        todos: [
-            { id: 1, text: "Finish Binary Tree Traversals", priority: "high", completed: false },
-            { id: 2, text: "Watch Transformer Networks video", priority: "medium", completed: true },
-            { id: 3, text: "Solve 10 Aptitude Logical Reasoning Qs", priority: "low", completed: false }
-        ],
-        mockTests: [
-            { id: 1, date: getOffsetDateString(-3), title: "DSA Trees Mock Test 1", category: "dsa", problemsSolved: 3, problemsTotal: 4, duration: 45, score: 75 }
-        ]
+        progress: {},
+        logs: [],
+        events: [],
+        resources: [],
+        todos: [],
+        mockTests: []
     };
     saveCoreData();
 }
