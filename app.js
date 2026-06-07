@@ -1,30 +1,22 @@
 /**
- * StellarStudy // Premium Personal Study Tracker Core Engine
- * Handcrafted in Vanilla JS with LocalStorage & IndexedDB Sandboxing
+ * StellarStudy // Premium Personal Study Tracker Core Engine (Full-Stack Version)
+ * Communicates with the Node.js Express Backend via REST APIs and JSON Web Tokens
  */
 
-// Global State Object
+// Global State Object (populated by server)
 let state = {
-    progress: {
-        dsa: 0,
-        ai: 0,
-        apti: 0,
-        systemdesign: 0,
-        tech: 0,
-        core: 0
-    },
+    progress: { dsa: 0, ai: 0, apti: 0, systemdesign: 0, tech: 0, core: 0 },
     logs: [],
     events: [],
     resources: [],
     todos: [],
-    mockTests: []
+    mockTests: [],
+    files: []
 };
 
 // Security Constants
-const AUTH_ID = "gayathrilight";
-const AUTH_PASSWORD = "mukesh";
 const SESSION_KEY = "stellar_study_auth_session";
-const DATA_KEY = "stellar_study_core_data";
+const TOKEN_KEY = "stellar_study_jwt_token";
 
 // Motivation Quotes Library
 const quotes = [
@@ -59,33 +51,12 @@ let timerRemaining = 1800;
 let timerIsRunning = false;
 let timerPresetSelected = 1800;
 
-// IndexedDB Constants for Sandboxed Storage
-const DB_NAME = "StellarStudyFilesDB";
-const DB_VERSION = 1;
-const STORE_NAME = "documents";
-let dbInstance = null;
-
 // Initialize Web App
 document.addEventListener("DOMContentLoaded", () => {
-    // 1. Check Authentication Status
+    // 1. Check Authentication Status and setup Login view
     initAuth();
     
-    // 2. Load Core Data from LocalStorage
-    loadCoreData();
-    
-    // 3. Initialize IndexedDB for Document Storage
-    initIndexedDB();
-
-    // 4. Initialize Core Views
-    renderDashboardProgress();
-    renderSubjectCards();
-    rotateMotivationQuote();
-    initCalendarWidget();
-    renderTodos();
-    renderResources("all");
-    renderTestHistory();
-
-    // 5. Setup UI Event Listeners
+    // 2. Setup UI Event Listeners
     setupNavigationEventListeners();
     setupDashboardEventListeners();
     setupCalendarEventListeners();
@@ -95,8 +66,42 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ==========================================================================
-   1. AUTHENTICATION & ACCESS MANAGEMENT
+   1. AUTHENTICATION & API UTILITIES
    ========================================================================== */
+function getAuthToken() {
+    return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+}
+
+// Global API Request Helper with Authorization Headers
+async function apiFetch(url, options = {}) {
+    const token = getAuthToken();
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...options.headers
+    };
+
+    // If body is FormData (file upload), let the browser set the content type and boundary
+    if (options.body instanceof FormData) {
+        delete headers['Content-Type'];
+    }
+
+    const response = await fetch(url, { ...options, headers });
+
+    if (response.status === 401 || response.status === 403) {
+        // Token has expired or is invalid, force logout
+        handleLogout();
+        throw new Error("Session expired. Please log in again.");
+    }
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+    }
+
+    return response.json();
+}
+
 function initAuth() {
     const loginOverlay = document.getElementById("login-overlay");
     const appContainer = document.getElementById("app-container");
@@ -105,55 +110,84 @@ function initAuth() {
     const logoutBtn = document.getElementById("btn-logout");
     const logoutMobileBtn = document.getElementById("btn-logout-mobile");
 
-    // Check if session token exists
-    const isAuthenticated = sessionStorage.getItem(SESSION_KEY) === "true" || localStorage.getItem(SESSION_KEY) === "true";
+    // Check if authenticated
+    const token = getAuthToken();
 
-    if (isAuthenticated) {
+    if (token) {
         loginOverlay.classList.add("hidden");
         appContainer.classList.remove("hidden-app");
         updateWelcomeHeader();
+        loadCoreData();
     }
 
-    loginForm.addEventListener("submit", (e) => {
+    loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const usernameInput = document.getElementById("username").value.trim();
         const passwordInput = document.getElementById("password").value;
 
-        if (usernameInput === AUTH_ID && passwordInput === AUTH_PASSWORD) {
-            sessionStorage.setItem(SESSION_KEY, "true");
-            localStorage.setItem(SESSION_KEY, "true"); // Preserve session across page loads
-            loginError.classList.add("hidden");
-            
-            // Elegant smooth transition
-            loginOverlay.style.opacity = "0";
-            setTimeout(() => {
-                loginOverlay.classList.add("hidden");
-                appContainer.classList.remove("hidden-app");
-                updateWelcomeHeader();
-                // Redraw canvas/progress rings to animate nicely
-                renderDashboardProgress();
-                renderSubjectCards();
-            }, 400);
-        } else {
+        try {
+            const data = await apiFetch('/api/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ username: usernameInput, password: passwordInput })
+            });
+
+            if (data.token) {
+                // Save Token
+                sessionStorage.setItem(SESSION_KEY, "true");
+                localStorage.setItem(SESSION_KEY, "true");
+                sessionStorage.setItem(TOKEN_KEY, data.token);
+                localStorage.setItem(TOKEN_KEY, data.token);
+
+                loginError.classList.add("hidden");
+                
+                // Elegant smooth transition
+                loginOverlay.style.opacity = "0";
+                setTimeout(() => {
+                    loginOverlay.classList.add("hidden");
+                    appContainer.classList.remove("hidden-app");
+                    updateWelcomeHeader();
+                    // Load server study data
+                    loadCoreData();
+                }, 400);
+            }
+        } catch (err) {
+            loginError.innerText = err.message;
             loginError.classList.remove("hidden");
-            // Clear passwords field
             document.getElementById("password").value = "";
         }
     });
 
-    const handleLogout = () => {
-        sessionStorage.removeItem(SESSION_KEY);
-        localStorage.removeItem(SESSION_KEY);
-        appContainer.classList.add("hidden-app");
-        loginOverlay.style.opacity = "1";
-        loginOverlay.classList.remove("hidden");
-        // Clear login form fields
-        document.getElementById("username").value = "";
-        document.getElementById("password").value = "";
-    };
-
     if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
     if (logoutMobileBtn) logoutMobileBtn.addEventListener("click", handleLogout);
+}
+
+function handleLogout() {
+    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+
+    const loginOverlay = document.getElementById("login-overlay");
+    const appContainer = document.getElementById("app-container");
+
+    appContainer.classList.add("hidden-app");
+    loginOverlay.style.opacity = "1";
+    loginOverlay.classList.remove("hidden");
+    
+    // Clear login form fields
+    document.getElementById("username").value = "";
+    document.getElementById("password").value = "";
+    
+    // Clear state
+    state = {
+        progress: { dsa: 0, ai: 0, apti: 0, systemdesign: 0, tech: 0, core: 0 },
+        logs: [],
+        events: [],
+        resources: [],
+        todos: [],
+        mockTests: [],
+        files: []
+    };
 }
 
 function updateWelcomeHeader() {
@@ -173,41 +207,35 @@ function updateWelcomeHeader() {
 }
 
 /* ==========================================================================
-   2. DATA STORE SYNCHRONIZATION (LocalStorage)
+   2. DATA SYNC & STORAGE (API Driven)
    ========================================================================== */
-function loadCoreData() {
-    const rawData = localStorage.getItem(DATA_KEY);
-    if (rawData) {
-        try {
-            state = JSON.parse(rawData);
-            // Patch structure changes if any
+async function loadCoreData() {
+    try {
+        const data = await apiFetch('/api/userdata');
+        if (data) {
+            state = data;
+            // Setup defaults if missing
             if (!state.progress) state.progress = { dsa: 0, ai: 0, apti: 0, systemdesign: 0, tech: 0, core: 0 };
             if (!state.logs) state.logs = [];
             if (!state.events) state.events = [];
             if (!state.resources) state.resources = [];
             if (!state.todos) state.todos = [];
             if (!state.mockTests) state.mockTests = [];
-            
-            // Instantly sync loaded progress values with loaded logs
+            if (!state.files) state.files = [];
+
             recalculateAllProgress();
-        } catch (e) {
-            console.error("Failed to parse localized payload", e);
-            initDefaultStore();
+            
+            // Refresh Active Tab Views
+            const activeTab = document.querySelector(".nav-item.active").getAttribute("data-tab");
+            refreshTabDisplay(activeTab);
         }
-    } else {
-        initDefaultStore();
+    } catch (err) {
+        console.error("Failed to load user state from server", err);
     }
 }
 
 function recalculateAllProgress() {
-    state.progress = {
-        dsa: 0,
-        ai: 0,
-        apti: 0,
-        systemdesign: 0,
-        tech: 0,
-        core: 0
-    };
+    state.progress = { dsa: 0, ai: 0, apti: 0, systemdesign: 0, tech: 0, core: 0 };
 
     if (state.logs) {
         state.logs.forEach(log => {
@@ -219,24 +247,37 @@ function recalculateAllProgress() {
     }
 }
 
-function saveCoreData() {
+async function saveCoreData() {
     recalculateAllProgress();
-    localStorage.setItem(DATA_KEY, JSON.stringify(state));
-    // Synchronize displays
-    renderDashboardProgress();
-    renderSubjectCards();
+    try {
+        await apiFetch('/api/sync', {
+            method: 'POST',
+            body: JSON.stringify(state)
+        });
+        
+        // Synchronize display views
+        renderDashboardProgress();
+        renderSubjectCards();
+    } catch (err) {
+        console.error("Failed to sync core study state with server", err);
+    }
 }
 
-function initDefaultStore() {
-    state = {
-        progress: {},
-        logs: [],
-        events: [],
-        resources: [],
-        todos: [],
-        mockTests: []
-    };
-    saveCoreData();
+function refreshTabDisplay(tabId) {
+    if (tabId === "home") {
+        renderDashboardProgress();
+        renderSubjectCards();
+        rotateMotivationQuote();
+    } else if (tabId === "calendar") {
+        initCalendarWidget();
+    } else if (tabId === "resources") {
+        renderResources("all");
+        renderTodos();
+    } else if (tabId === "files") {
+        renderFilesVaultList();
+    } else if (tabId === "mocktest") {
+        renderTestHistory();
+    }
 }
 
 // Utility to get date relative to today
@@ -268,21 +309,7 @@ function setupNavigationEventListeners() {
                 targetTab.classList.add("active");
             }
 
-            // Perform context-specific refreshes
-            if (targetTabId === "home") {
-                renderDashboardProgress();
-                renderSubjectCards();
-                renderHomeTimelineFeeds();
-            } else if (targetTabId === "calendar") {
-                initCalendarWidget();
-            } else if (targetTabId === "resources") {
-                renderResources("all");
-                renderTodos();
-            } else if (targetTabId === "files") {
-                renderFilesVaultList();
-            } else if (targetTabId === "mocktest") {
-                renderTestHistory();
-            }
+            refreshTabDisplay(targetTabId);
         });
     });
 }
@@ -300,8 +327,7 @@ function renderDashboardProgress() {
     document.getElementById("overall-progress-text").innerText = average;
     document.getElementById("overall-percentage-badge").innerText = `${average}%`;
 
-    // Calculate Dashoffset for Circular Progress ring
-    // Circumference = 2 * PI * R = 2 * 3.14159 * 58 = 364.42
+    // Calculate Dashoffset for Circular Progress ring (Circumference = 364.4)
     const ringFill = document.getElementById("overall-ring-fill");
     const circumference = 364.4;
     const offset = circumference - (average / 100) * circumference;
@@ -415,7 +441,6 @@ function renderHomeTimelineFeeds() {
             if (ev.type === "milestone") indicatorColorClass = "dot-milestone";
             else if (ev.type === "test") indicatorColorClass = "dot-test";
 
-            // Format date nicely
             const d = new Date(ev.date);
             const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -438,7 +463,7 @@ function renderHomeTimelineFeeds() {
     if (sortedLogs.length === 0) {
         recentLogsContainer.innerHTML = `
             <div class="empty-state">
-                <p>No logs found. Go to Calendar to record details!</p>
+                <p>No logs found. Head over to Calendar tab to log your study sessions!</p>
             </div>
         `;
     } else {
@@ -489,7 +514,6 @@ function setupCalendarEventListeners() {
         viewDay.classList.remove("hidden-subview");
         viewMonth.classList.add("hidden-subview");
         renderStudyLogsTable();
-        // Default today's date in form
         document.getElementById("log-date").value = getOffsetDateString(0);
     });
 
@@ -535,7 +559,6 @@ function setupCalendarEventListeners() {
         state.events.push(newEvent);
         saveCoreData();
         
-        // Reset and refresh configurations
         document.getElementById("event-title").value = "";
         document.getElementById("event-time").value = "";
         
@@ -556,7 +579,6 @@ function setupCalendarEventListeners() {
 
         if (!dateVal || !categoryVal || isNaN(durationVal) || isNaN(percentVal) || !descVal) return;
 
-        // Log session
         const newLog = {
             id: Date.now(),
             date: dateVal,
@@ -569,11 +591,9 @@ function setupCalendarEventListeners() {
         state.logs.push(newLog);
         saveCoreData();
 
-        // Reset form
         studyLogForm.reset();
         document.getElementById("log-date").value = getOffsetDateString(0);
 
-        // Refresh Logs
         renderStudyLogsTable();
     });
 }
@@ -588,42 +608,36 @@ function renderCalendarDays() {
     const grid = document.getElementById("calendar-days-grid");
     const label = document.getElementById("calendar-month-year-label");
     
-    // Clear grid contents
     grid.innerHTML = "";
-
-    // Set Label
     label.innerText = `${monthNames[currentMonth]} ${currentYear}`;
 
-    // Get parameters
     const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
     const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
     const prevTotalDays = new Date(currentYear, currentMonth, 0).getDate();
 
-    // RENDER INACTIVE PREV MONTH PADDING
+    // Inactive previous month padding
     for (let i = firstDayIndex - 1; i >= 0; i--) {
         const dayNum = prevTotalDays - i;
         const monthNum = currentMonth === 0 ? 11 : currentMonth - 1;
         const yearNum = currentMonth === 0 ? currentYear - 1 : currentYear;
         const dateStr = formatDateString(yearNum, monthNum, dayNum);
-
         createDayNode(grid, dayNum, dateStr, true);
     }
 
-    // RENDER CURRENT MONTH DAYS
+    // Current month days
     const todayStr = getOffsetDateString(0);
     for (let day = 1; day <= totalDays; day++) {
         const dateStr = formatDateString(currentYear, currentMonth, day);
         createDayNode(grid, day, dateStr, false, dateStr === todayStr);
     }
 
-    // RENDER NEXT MONTH PADDING DAYS (fill row of 7s)
+    // Inactive next month padding
     const totalRendered = firstDayIndex + totalDays;
-    const paddingNeeded = 42 - totalRendered; // Maintain standard 6 calendar rows
+    const paddingNeeded = 42 - totalRendered;
     for (let day = 1; day <= paddingNeeded; day++) {
         const monthNum = currentMonth === 11 ? 0 : currentMonth + 1;
         const yearNum = currentMonth === 11 ? currentYear + 1 : currentYear;
         const dateStr = formatDateString(yearNum, monthNum, day);
-
         createDayNode(grid, day, dateStr, true);
     }
 }
@@ -635,29 +649,22 @@ function createDayNode(container, dayNum, dateStr, isInactive, isToday = false) 
     if (isToday) node.classList.add("current-day-badge");
     if (selectedCalendarDate === dateStr) node.classList.add("selected-day-badge");
 
-    // Click handler to select date
     node.addEventListener("click", () => {
         selectedCalendarDate = dateStr;
-        
-        // Remove class from all other cells
         const allDays = container.querySelectorAll(".calendar-grid-day");
         allDays.forEach(cell => cell.classList.remove("selected-day-badge"));
         node.classList.add("selected-day-badge");
-
         renderDayEventDetails(dateStr);
     });
 
-    // Content: number
     const numSpan = document.createElement("span");
     numSpan.className = "day-num-label";
     numSpan.innerText = dayNum;
     node.appendChild(numSpan);
 
-    // Content: Indicator dots representing scheduled events & logged studies
     const dotsDiv = document.createElement("div");
     dotsDiv.className = "day-event-dots";
 
-    // 1. Check if mock test, deadline, or milestone is set
     const dayEvents = state.events.filter(ev => ev.date === dateStr);
     dayEvents.forEach(ev => {
         const dot = document.createElement("div");
@@ -665,7 +672,6 @@ function createDayNode(container, dayNum, dateStr, isInactive, isToday = false) 
         dotsDiv.appendChild(dot);
     });
 
-    // 2. Check if study hour is logged on this date
     const isStudyLogged = state.logs.some(log => log.date === dateStr);
     if (isStudyLogged) {
         const dot = document.createElement("div");
@@ -682,12 +688,10 @@ function renderDayEventDetails(dateStr) {
     const dateTitle = document.getElementById("calendar-selected-date-title");
     const dateSubtitle = document.getElementById("calendar-selected-date-subtitle");
     
-    // Set Header titles
     const options = { month: "short", day: "numeric", year: "numeric" };
     dateTitle.innerText = selectedDate.toLocaleDateString("en-US", options);
     dateSubtitle.innerText = "Schedule events, milestones & deadlines";
 
-    // Enable Event Input Form
     const eventForm = document.getElementById("add-event-form");
     const eventTitle = document.getElementById("event-title");
     const eventTime = document.getElementById("event-time");
@@ -702,7 +706,7 @@ function renderDayEventDetails(dateStr) {
 
     document.getElementById("event-date-field").value = dateStr;
 
-    // Render Logs for this date
+    // Study logs for selection
     const daySummary = document.getElementById("day-study-summary");
     const dayLogs = state.logs.filter(log => log.date === dateStr);
 
@@ -724,7 +728,7 @@ function renderDayEventDetails(dateStr) {
         }).join("");
     }
 
-    // Render Deadlines/Events Scheduled for this date
+    // Events for selection
     const dayEventsList = document.getElementById("day-events-list");
     const dayEvents = state.events.filter(ev => ev.date === dateStr);
 
@@ -751,7 +755,6 @@ function renderDayEventDetails(dateStr) {
     }
 }
 
-// Global hook to delete event
 window.deleteCalendarEvent = function(eventId, dateStr) {
     state.events = state.events.filter(ev => ev.id !== eventId);
     saveCoreData();
@@ -772,7 +775,6 @@ function renderStudyLogsTable() {
         emptyState.classList.add("hidden");
         tableContainer.classList.remove("hidden");
 
-        // Sort descending
         const sortedLogs = [...state.logs].sort((a, b) => new Date(b.date) - new Date(a.date));
 
         tbody.innerHTML = sortedLogs.map(log => {
@@ -804,7 +806,6 @@ window.deleteStudyLog = function(logId) {
     renderStudyLogsTable();
 };
 
-// Utilities
 function formatDateString(year, month, day) {
     const y = year;
     const m = String(month + 1).padStart(2, "0");
@@ -833,7 +834,6 @@ function setupResourcesEventListeners() {
     const resourcePanel = document.getElementById("add-resource-panel");
     const filterChips = document.querySelectorAll(".resource-filters .filter-chip");
 
-    // Toggle resource form drawer
     openAddBtn.addEventListener("click", () => {
         resourcePanel.classList.toggle("hidden-element");
     });
@@ -842,7 +842,6 @@ function setupResourcesEventListeners() {
         resourcePanel.classList.add("hidden-element");
     });
 
-    // Form Event: Save Bookmark
     const addResourceForm = document.getElementById("add-resource-form");
     addResourceForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -866,23 +865,19 @@ function setupResourcesEventListeners() {
         addResourceForm.reset();
         resourcePanel.classList.add("hidden-element");
         
-        // Refresh active filters
         const activeFilter = document.querySelector(".resource-filters .filter-chip.active").getAttribute("data-filter");
         renderResources(activeFilter);
     });
 
-    // Resource Filter Chip Clicks
     filterChips.forEach(chip => {
         chip.addEventListener("click", () => {
             filterChips.forEach(c => c.classList.remove("active"));
             chip.classList.add("active");
-            
             const filterVal = chip.getAttribute("data-filter");
             renderResources(filterVal);
         });
     });
 
-    // Form Event: Save Todo Checklist Item
     const todoForm = document.getElementById("add-todo-form");
     todoForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -907,7 +902,6 @@ function setupResourcesEventListeners() {
         renderTodos();
     });
 
-    // Clear completed todos
     document.getElementById("btn-clear-completed-todo").addEventListener("click", () => {
         state.todos = state.todos.filter(t => !t.completed);
         saveCoreData();
@@ -970,7 +964,6 @@ function renderTodos() {
     const container = document.getElementById("todos-list-container");
     const countsDisplay = document.getElementById("todo-counts-display");
 
-    // Calculate pending counts
     const pendingTodos = state.todos.filter(t => !t.completed);
     countsDisplay.innerText = `${pendingTodos.length} Active Items`;
 
@@ -981,13 +974,12 @@ function renderTodos() {
             </div>
         `;
     } else {
-        // Sort todos: high priority first, completed last
         const sortedTodos = [...state.todos].sort((a, b) => {
             if (a.completed !== b.completed) {
-                return a.completed ? 1 : -1; // Uncompleted first
+                return a.completed ? 1 : -1;
             }
             const priorities = { high: 3, medium: 2, low: 1 };
-            return priorities[b.priority] - priorities[a.priority]; // High priority first
+            return priorities[b.priority] - priorities[a.priority];
         });
 
         container.innerHTML = sortedTodos.map(todo => {
@@ -1028,28 +1020,8 @@ window.deleteTodo = function(todoId) {
 };
 
 /* ==========================================================================
-   7. TAB 4: FILE VAULT SYSTEM (IndexedDB Stateful Storage)
+   7. TAB 4: FILE VAULT SYSTEM (Multipart Server-Side Storage)
    ========================================================================== */
-function initIndexedDB() {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = (e) => {
-        console.error("IndexedDB startup error", e);
-    };
-
-    request.onsuccess = (e) => {
-        dbInstance = e.target.result;
-        renderFilesVaultList();
-    };
-
-    request.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-            db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        }
-    };
-}
-
 function setupFilesEventListeners() {
     const dropzone = document.getElementById("file-dropzone");
     const fileInput = document.getElementById("real-file-input");
@@ -1064,7 +1036,6 @@ function setupFilesEventListeners() {
         handleVaultFiles(e.target.files);
     });
 
-    // Drag-and-drop Event handlers
     dropzone.addEventListener("dragenter", (e) => {
         e.preventDefault();
         dropzone.classList.add("dragover");
@@ -1085,7 +1056,6 @@ function setupFilesEventListeners() {
         handleVaultFiles(e.dataTransfer.files);
     });
 
-    // File category filters
     fileFilters.forEach(chip => {
         chip.addEventListener("click", () => {
             fileFilters.forEach(c => c.classList.remove("active"));
@@ -1095,7 +1065,7 @@ function setupFilesEventListeners() {
     });
 }
 
-function handleVaultFiles(files) {
+async function handleVaultFiles(files) {
     if (!files || files.length === 0) return;
     
     const indicator = document.getElementById("upload-status-indicator");
@@ -1105,186 +1075,132 @@ function handleVaultFiles(files) {
     indicator.classList.remove("hidden-element");
     bar.style.width = "0%";
 
-    // Recursive reader helper for multiple files
-    let fileIdx = 0;
-    
-    function readNext() {
-        if (fileIdx >= files.length) {
-            setTimeout(() => {
-                indicator.classList.add("hidden-element");
-                renderFilesVaultList();
-            }, 600);
-            return;
-        }
+    // Loop upload files to backend server
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        label.innerText = `Uploading: ${file.name} (${formatBytes(file.size)})`;
+        bar.style.width = `${(i / files.length) * 100}%`;
 
-        const file = files[fileIdx];
-        label.innerText = `Caching: ${file.name} (${formatBytes(file.size)})`;
-        bar.style.width = `${((fileIdx + 0.5) / files.length) * 100}%`;
+        const formData = new FormData();
+        formData.append('file', file);
 
-        const reader = new FileReader();
-        
-        reader.onload = (e) => {
-            const fileData = {
-                id: Date.now() + "_" + Math.floor(Math.random() * 1000),
-                name: file.name,
-                size: file.size,
-                type: file.type || getFallbackFileType(file.name),
-                uploadedAt: new Date().toISOString().split("T")[0],
-                dataUrl: e.target.result // Base64 encoding
-            };
-
-            saveFileToIndexedDB(fileData, () => {
-                bar.style.width = `${((fileIdx + 1) / files.length) * 100}%`;
-                fileIdx++;
-                readNext();
+        try {
+            const result = await apiFetch('/api/files/upload', {
+                method: 'POST',
+                body: formData
             });
-        };
 
-        reader.readAsDataURL(file);
+            if (result.file) {
+                // Add uploaded file reference to state
+                if (!state.files) state.files = [];
+                state.files.push(result.file);
+            }
+        } catch (err) {
+            console.error("File upload failed", err);
+            alert(`Failed to upload file ${file.name}: ${err.message}`);
+        }
     }
 
-    readNext();
-}
-
-function getFallbackFileType(filename) {
-    const ext = filename.split(".").pop().toLowerCase();
-    if (ext === "pdf") return "application/pdf";
-    if (ext === "xls" || ext === "xlsx") return "application/vnd.ms-excel";
-    if (ext === "epub" || ext === "mobi" || ext === "txt") return "application/epub+zip";
-    return "application/octet-stream";
-}
-
-function saveFileToIndexedDB(fileObj, callback) {
-    if (!dbInstance) {
-        console.error("IndexedDB instance not ready");
-        return;
-    }
-
-    const tx = dbInstance.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    store.add(fileObj);
-
-    tx.oncomplete = () => {
-        if (callback) callback();
-    };
-    tx.onerror = (e) => {
-        console.error("IndexedDB insert error", e);
-    };
+    bar.style.width = "100%";
+    setTimeout(() => {
+        indicator.classList.add("hidden-element");
+        renderFilesVaultList();
+    }, 600);
 }
 
 function renderFilesVaultList() {
-    if (!dbInstance) return;
-
     const listContainer = document.getElementById("files-vault-list");
     const activeFilter = document.querySelector(".files-category-selector .filter-chip.active").getAttribute("data-file-filter");
 
-    const tx = dbInstance.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.getAll();
+    const allFiles = state.files || [];
+    
+    // Calculate storage space
+    const totalSize = allFiles.reduce((acc, curr) => acc + curr.size, 0);
+    document.getElementById("storage-utilization-badge").innerText = formatBytes(totalSize);
 
-    request.onsuccess = (e) => {
-        const allFiles = e.target.result || [];
-        
-        // Calculate storage space
-        const totalSize = allFiles.reduce((acc, curr) => acc + curr.size, 0);
-        document.getElementById("storage-utilization-badge").innerText = formatBytes(totalSize);
+    // Filter files based on chips
+    let filtered = allFiles;
+    if (activeFilter === "pdf") {
+        filtered = allFiles.filter(f => f.type.toLowerCase().includes("pdf"));
+    } else if (activeFilter === "excel") {
+        filtered = allFiles.filter(f => f.type.toLowerCase().includes("excel") || f.type.toLowerCase().includes("sheet") || f.name.endsWith(".xls") || f.name.endsWith(".xlsx") || f.name.endsWith(".csv"));
+    } else if (activeFilter === "ebook") {
+        filtered = allFiles.filter(f => f.name.endsWith(".epub") || f.name.endsWith(".mobi") || f.name.endsWith(".txt") || f.type.includes("epub"));
+    }
 
-        // Filter files based on chips
-        let filtered = allFiles;
-        if (activeFilter === "pdf") {
-            filtered = allFiles.filter(f => f.type.toLowerCase().includes("pdf"));
-        } else if (activeFilter === "excel") {
-            filtered = allFiles.filter(f => f.type.toLowerCase().includes("excel") || f.type.toLowerCase().includes("sheet") || f.name.endsWith(".xls") || f.name.endsWith(".xlsx") || f.name.endsWith(".csv"));
-        } else if (activeFilter === "ebook") {
-            filtered = allFiles.filter(f => f.name.endsWith(".epub") || f.name.endsWith(".mobi") || f.name.endsWith(".txt") || f.type.includes("epub"));
-        }
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `
+            <div class="empty-state">
+                <p>No documents matching this category in server vault.</p>
+            </div>
+        `;
+    } else {
+        // Sort descending
+        filtered.sort((a, b) => b.id.localeCompare(a.id));
 
-        if (filtered.length === 0) {
-            listContainer.innerHTML = `
-                <div class="empty-state">
-                    <p>No cached documents matching this category.</p>
-                </div>
-            `;
-        } else {
-            // Sort by uploadedAt (or ID as timestamp fallback)
-            filtered.sort((a, b) => b.id.localeCompare(a.id));
+        listContainer.innerHTML = filtered.map(file => {
+            let badgeClass = "icon-ebook";
+            let badgeSVG = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
 
-            listContainer.innerHTML = filtered.map(file => {
-                let badgeClass = "icon-ebook";
-                let badgeSVG = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>`;
+            if (file.type.includes("pdf")) {
+                badgeClass = "icon-pdf";
+                badgeSVG = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`;
+            } else if (file.type.includes("excel") || file.type.includes("sheet") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
+                badgeClass = "icon-excel";
+                badgeSVG = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>`;
+            }
 
-                if (file.type.includes("pdf")) {
-                    badgeClass = "icon-pdf";
-                    badgeSVG = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>`;
-                } else if (file.type.includes("excel") || file.type.includes("sheet") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls") || file.name.endsWith(".csv")) {
-                    badgeClass = "icon-excel";
-                    badgeSVG = `<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>`;
-                }
-
-                return `
-                    <div class="file-item-row">
-                        <div class="file-details-left">
-                            <div class="file-type-icon ${badgeClass}">
-                                ${badgeSVG}
-                            </div>
-                            <div class="file-meta-text">
-                                <h5>${escapeHTML(file.name)}</h5>
-                                <div class="file-subtext">Cached: ${file.uploadedAt} • Size: ${formatBytes(file.size)}</div>
-                            </div>
+            return `
+                <div class="file-item-row">
+                    <div class="file-details-left">
+                        <div class="file-type-icon ${badgeClass}">
+                            ${badgeSVG}
                         </div>
-                        <div class="file-actions-right">
-                            <button class="btn-file-download" onclick="downloadVaultFile('${file.id}')" title="Retrieve Document">
-                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            </button>
-                            <button class="btn-table-action" onclick="deleteVaultFile('${file.id}')" style="margin-left: 0.5rem;" title="Delete Cached Document">
-                                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                            </button>
+                        <div class="file-meta-text">
+                            <h5>${escapeHTML(file.name)}</h5>
+                            <div class="file-subtext">Uploaded: ${file.uploadedAt} • Size: ${formatBytes(file.size)}</div>
                         </div>
                     </div>
-                `;
-            }).join("");
-        }
-    };
+                    <div class="file-actions-right">
+                        <button class="btn-file-download" onclick="downloadVaultFile('${file.id}')" title="Download Document">
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        </button>
+                        <button class="btn-table-action" onclick="deleteVaultFile('${file.id}')" style="margin-left: 0.5rem;" title="Delete Document from Server">
+                            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
 }
 
 window.downloadVaultFile = function(fileId) {
-    if (!dbInstance) return;
-
-    const tx = dbInstance.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const request = store.get(fileId);
-
-    request.onsuccess = (e) => {
-        const file = e.target.result;
-        if (!file) return;
-
-        // Recreate Blob for Download Anchor
-        const fetchResponse = fetch(file.dataUrl);
-        fetchResponse.then(res => res.blob()).then(blob => {
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement("a");
-            anchor.href = url;
-            anchor.download = file.name;
-            document.body.appendChild(anchor);
-            anchor.click();
-            
-            // Clean up
-            document.body.removeChild(anchor);
-            URL.revokeObjectURL(url);
-        });
-    };
+    // Redirect browser directly to download url (bypass jwt block on link clicks)
+    const anchor = document.createElement("a");
+    anchor.href = `/api/files/download/${fileId}`;
+    anchor.target = "_blank";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
 };
 
-window.deleteVaultFile = function(fileId) {
-    if (!dbInstance) return;
+window.deleteVaultFile = async function(fileId) {
+    if (!confirm("Are you sure you want to delete this document from the server vault?")) return;
+    
+    try {
+        const response = await apiFetch(`/api/files/${fileId}`, {
+            method: 'DELETE'
+        });
 
-    const tx = dbInstance.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    store.delete(fileId);
-
-    tx.oncomplete = () => {
-        renderFilesVaultList();
-    };
+        if (response.success) {
+            state.files = state.files.filter(f => f.id !== fileId);
+            renderFilesVaultList();
+        }
+    } catch (err) {
+        console.error("Failed to delete physical file from server", err);
+        alert(err.message);
+    }
 };
 
 // Size formatting utility
@@ -1305,14 +1221,11 @@ function setupTimerEventListeners() {
     const btnReset = document.getElementById("btn-timer-reset");
     const presetsRow = document.getElementById("timer-presets-row");
 
-    // Preset selection click
     presetsRow.addEventListener("click", (e) => {
         const presetBtn = e.target.closest("button");
         if (!presetBtn || timerIsRunning) return;
 
         const val = parseInt(presetBtn.getAttribute("data-preset"));
-        
-        // Update presets active states
         presetsRow.querySelectorAll("button").forEach(btn => btn.classList.remove("active-preset"));
         presetBtn.classList.add("active-preset");
 
@@ -1334,7 +1247,6 @@ function setupTimerEventListeners() {
         resetTimer();
     });
 
-    // Form Event: Log Coding Mock Test Record
     const testLogForm = document.getElementById("mock-test-log-form");
     testLogForm.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -1378,11 +1290,9 @@ function startTimer() {
     indicator.innerText = "TEST ACTIVE";
     indicator.style.color = "var(--accent-pink)";
     
-    // Toggle label/SVG icon to Pause
     labelSpan.innerText = "Pause Test chronometer";
     iconSVG.innerHTML = `<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>`;
 
-    // Store starting time for robust delta checking
     let lastTime = Date.now();
 
     timerInterval = setInterval(() => {
@@ -1401,7 +1311,7 @@ function startTimer() {
                 resetTimer();
             }
         }
-    }, 200); // Poll quick to prevent delay skips
+    }, 200);
 }
 
 function pauseTimer() {
@@ -1413,7 +1323,6 @@ function pauseTimer() {
     indicator.innerText = "PAUSED";
     indicator.style.color = "var(--accent-yellow)";
 
-    // Toggle label/SVG icon back to Play
     labelSpan.innerText = "Resume Test Session";
     iconSVG.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
 
@@ -1436,27 +1345,22 @@ function updateTimerDisplay() {
     const timerDisplay = document.getElementById("timer-display");
     const timerRing = document.getElementById("timer-ring-fill");
 
-    // Format minutes and seconds
     const minutes = String(Math.floor(timerRemaining / 60)).padStart(2, "0");
     const seconds = String(timerRemaining % 60).padStart(2, "0");
     timerDisplay.innerText = `${minutes}:${seconds}`;
 
-    // Circular Ring offset equations
-    // Circumference = 2 * PI * R = 2 * 3.14159 * 98 = 615.75
-    const circumference = 615.75;
+    const circumference = 502.65; // Matches the mobile scaled circle (2 * PI * 80 = 502.65)
     const fractionElapsed = (timerDuration - timerRemaining) / timerDuration;
     const offset = fractionElapsed * circumference;
     timerRing.style.strokeDashoffset = offset;
 }
 
-// Synth alarm chimes using HTML5 Web Audio API
 function playChimeSound() {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (!audioCtx) return;
 
-        // Custom chime melody arpeggio
-        const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+        const notes = [261.63, 329.63, 392.00, 523.25];
         let time = audioCtx.currentTime;
 
         notes.forEach((freq, idx) => {
@@ -1466,7 +1370,6 @@ function playChimeSound() {
             osc.type = "sine";
             osc.frequency.setValueAtTime(freq, time);
             
-            // Envelope details
             gainNode.gain.setValueAtTime(0, time);
             gainNode.gain.linearRampToValueAtTime(0.3, time + 0.05);
             gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.6);
@@ -1477,7 +1380,7 @@ function playChimeSound() {
             osc.start(time);
             osc.stop(time + 0.6);
 
-            time += 0.15; // Shift notes slightly for arpeggio effect
+            time += 0.15;
         });
     } catch (e) {
         console.error("Browser Web Audio API blocked or not supported", e);
@@ -1497,13 +1400,11 @@ function renderTestHistory() {
         emptyState.classList.add("hidden");
         tableContainer.classList.remove("hidden");
 
-        // Sort descending
         const sortedTests = [...state.mockTests].sort((a, b) => b.id - a.id);
 
         tbody.innerHTML = sortedTests.map(test => {
             const catLabel = getCategoryLabel(test.category);
             
-            // Score color thresholds
             let efficiencyClass = "priority-low";
             if (test.score >= 80) efficiencyClass = "priority-medium";
             if (test.score >= 90) efficiencyClass = "priority-high";
