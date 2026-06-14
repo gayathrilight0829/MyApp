@@ -67,7 +67,7 @@ const StudyState = mongoose.model('StudyState', studyStateSchema);
 
 // Default Starting Database Structure
 const DEFAULT_DB = {
-    progress: { dsa: 15, ai: 10, apti: 20, systemdesign: 5, tech: 25, core: 30 },
+    progress: {},
     logs: [],
     events: [],
     resources: [],
