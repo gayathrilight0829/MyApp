@@ -27,9 +27,10 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 // MONGODB CONNECTION SETUP
 // --------------------------------------------------------------------------
 const MONGODB_URI = process.env.MONGODB_URI;
+const isMongoConfigured = !!(MONGODB_URI && !MONGODB_URI.includes('<username>'));
 let mongoConnected = false;
 
-if (!MONGODB_URI || MONGODB_URI.includes('<username>')) {
+if (!isMongoConfigured) {
     console.warn("WARNING: MONGODB_URI is not configured in .env or contains placeholder credentials.");
     console.warn("Falling back to local db/data.json file database.");
 } else {
@@ -40,7 +41,7 @@ if (!MONGODB_URI || MONGODB_URI.includes('<username>')) {
         })
         .catch(err => {
             console.error("MongoDB Atlas connection error:", err.message);
-            console.warn("Falling back to local db/data.json file database.");
+            console.warn("WARNING: MongoDB configuration failed. Database fallback is disabled for safety.");
         });
 }
 
@@ -86,8 +87,44 @@ function getOffsetDateString(daysOffset) {
 // DATABASE PORTABILITY HELPERS
 // --------------------------------------------------------------------------
 
-function isMongoConnected() {
-    return mongoose.connection.readyState === 1;
+async function ensureDbReady() {
+    if (!isMongoConfigured) {
+        return false;
+    }
+    if (mongoose.connection.readyState === 1) {
+        return true;
+    }
+    if (mongoose.connection.readyState === 2) {
+        try {
+            await new Promise((resolve) => {
+                const onConnected = () => {
+                    cleanup();
+                    resolve();
+                };
+                const onError = () => {
+                    cleanup();
+                    resolve();
+                };
+                const timer = setTimeout(() => {
+                    cleanup();
+                    resolve();
+                }, 5000); // Wait up to 5 seconds for connection
+
+                function cleanup() {
+                    clearTimeout(timer);
+                    mongoose.connection.removeListener('connected', onConnected);
+                    mongoose.connection.removeListener('error', onError);
+                }
+
+                mongoose.connection.once('connected', onConnected);
+                mongoose.connection.once('error', onError);
+            });
+            return mongoose.connection.readyState === 1;
+        } catch (e) {
+            return false;
+        }
+    }
+    return false;
 }
 
 // Read local file fallback
@@ -120,34 +157,34 @@ function writeDatabase(data) {
 
 // Unified Async read state helper
 async function getUserState(username) {
-    if (isMongoConnected()) {
-        try {
-            let doc = await StudyState.findOne({ username });
-            if (!doc) {
-                doc = new StudyState({ username, ...DEFAULT_DB });
-                await doc.save();
-            }
-            return doc;
-        } catch (e) {
-            console.error("MongoDB read error, falling back to local file", e);
+    if (isMongoConfigured) {
+        const isReady = await ensureDbReady();
+        if (!isReady) {
+            throw new Error("MongoDB database is not available.");
         }
+        let doc = await StudyState.findOne({ username });
+        if (!doc) {
+            doc = new StudyState({ username, ...DEFAULT_DB });
+            await doc.save();
+        }
+        return doc;
     }
     return readDatabase();
 }
 
 // Unified Async write state helper
 async function saveUserState(username, updatedFields) {
-    if (isMongoConnected()) {
-        try {
-            const doc = await StudyState.findOneAndUpdate(
-                { username },
-                { $set: updatedFields },
-                { new: true, upsert: true }
-            );
-            return doc;
-        } catch (e) {
-            console.error("MongoDB write error, falling back to local file write", e);
+    if (isMongoConfigured) {
+        const isReady = await ensureDbReady();
+        if (!isReady) {
+            throw new Error("MongoDB database is not available.");
         }
+        const doc = await StudyState.findOneAndUpdate(
+            { username },
+            { $set: updatedFields },
+            { new: true, upsert: true }
+        );
+        return doc;
     }
     const db = readDatabase();
     Object.assign(db, updatedFields);
@@ -159,7 +196,8 @@ async function saveUserState(username, updatedFields) {
 // MIDDLEWARE CONFIGURATION
 // --------------------------------------------------------------------------
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Serve static frontend assets
 app.use(express.static(path.join(__dirname)));
@@ -215,11 +253,16 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Get User State Database
+// Get User State Database
 app.get('/api/userdata', authenticateToken, async (req, res) => {
     try {
         const db = await getUserState(req.user.username);
         res.json(db);
     } catch (err) {
+        console.error("Error in /api/userdata:", err.message);
+        if (err.message.includes("MongoDB database")) {
+            return res.status(503).json({ error: 'Database service is currently unavailable. Please wait while connection is established.' });
+        }
         res.status(500).json({ error: 'Failed to retrieve user database' });
     }
 });
@@ -240,6 +283,10 @@ app.post('/api/sync', authenticateToken, async (req, res) => {
         await saveUserState(req.user.username, updateData);
         res.json({ success: true, message: 'Sync complete' });
     } catch (err) {
+        console.error("Error in /api/sync:", err.message);
+        if (err.message.includes("MongoDB database")) {
+            return res.status(503).json({ error: 'Database service is currently unavailable. Changes cannot be synchronized.' });
+        }
         res.status(500).json({ error: 'Failed to write synced state to database' });
     }
 });
@@ -268,6 +315,10 @@ app.post('/api/files/upload', authenticateToken, upload.single('file'), async (r
         await saveUserState(req.user.username, { files });
         res.json({ success: true, file: fileMeta });
     } catch (err) {
+        console.error("Error in /api/files/upload:", err.message);
+        if (err.message.includes("MongoDB database")) {
+            return res.status(503).json({ error: 'Database service is currently unavailable. File metadata cannot be saved.' });
+        }
         res.status(500).json({ error: 'Failed to save file metadata' });
     }
 });
@@ -276,11 +327,14 @@ app.post('/api/files/upload', authenticateToken, upload.single('file'), async (r
 app.get('/api/files/download/:id', async (req, res) => {
     let file = null;
     
-    if (isMongoConnected()) {
+    if (isMongoConfigured) {
         try {
-            const doc = await StudyState.findOne({ "files.id": req.params.id }, { files: 1 });
-            if (doc && doc.files) {
-                file = doc.files.find(f => f.id === req.params.id);
+            const isReady = await ensureDbReady();
+            if (isReady) {
+                const doc = await StudyState.findOne({ "files.id": req.params.id }, { files: 1 });
+                if (doc && doc.files) {
+                    file = doc.files.find(f => f.id === req.params.id);
+                }
             }
         } catch (e) {
             console.error("MongoDB file download look up error", e);
@@ -288,9 +342,11 @@ app.get('/api/files/download/:id', async (req, res) => {
     }
 
     if (!file) {
-        // Fallback file lookup
-        const db = readDatabase();
-        file = db.files.find(f => f.id === req.params.id);
+        // Fallback local lookup ONLY if MongoDB is not configured
+        if (!isMongoConfigured) {
+            const db = readDatabase();
+            file = db.files.find(f => f.id === req.params.id);
+        }
     }
 
     if (!file) {
@@ -334,6 +390,10 @@ app.delete('/api/files/:id', authenticateToken, async (req, res) => {
 
         res.json({ success: true, message: 'File deleted successfully' });
     } catch (err) {
+        console.error("Error in delete file:", err.message);
+        if (err.message.includes("MongoDB database")) {
+            return res.status(503).json({ error: 'Database service is currently unavailable. File cannot be deleted.' });
+        }
         res.status(500).json({ error: 'Failed to delete file' });
     }
 });

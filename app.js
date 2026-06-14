@@ -236,6 +236,10 @@ async function loadCoreData() {
         }
     } catch (err) {
         console.error("Failed to load user state from server", err);
+        const subTitleText = document.getElementById("current-date-display");
+        if (subTitleText) {
+            subTitleText.innerHTML = `<span style="color: var(--accent-pink); font-weight: 600;">⚠ DATABASE CONNECTION ERROR // Offline Mode Active (Changes will not be saved)</span>`;
+        }
     }
 }
 
