@@ -55,7 +55,9 @@ function readDatabase() {
 
 function writeDatabase(data) {
     try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 4), 'utf8');
+        const tempFile = DATA_FILE + '.tmp';
+        fs.writeFileSync(tempFile, JSON.stringify(data, null, 4), 'utf8');
+        fs.renameSync(tempFile, DATA_FILE);
         return true;
     } catch (e) {
         console.error("Database writing error", e);

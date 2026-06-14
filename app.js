@@ -14,6 +14,8 @@ let state = {
     files: []
 };
 
+let isDataLoaded = false;
+
 // Security Constants
 const SESSION_KEY = "stellar_study_auth_session";
 const TOKEN_KEY = "stellar_study_jwt_token";
@@ -188,6 +190,7 @@ function handleLogout() {
         mockTests: [],
         files: []
     };
+    isDataLoaded = false;
 }
 
 function updateWelcomeHeader() {
@@ -223,6 +226,8 @@ async function loadCoreData() {
             if (!state.mockTests) state.mockTests = [];
             if (!state.files) state.files = [];
 
+            isDataLoaded = true; // Mark as successfully fetched
+
             recalculateAllProgress();
             
             // Refresh Active Tab Views
@@ -248,6 +253,10 @@ function recalculateAllProgress() {
 }
 
 async function saveCoreData() {
+    if (!isDataLoaded) {
+        console.warn("Attempted to save core data before loading from server. Sync aborted.");
+        return;
+    }
     recalculateAllProgress();
     try {
         await apiFetch('/api/sync', {

@@ -1,0 +1,3 @@
+{
+  "ignore": ["db/*", "test_api.js", "test_sync.js"]
+}

@@ -1,0 +1,33 @@
+{
+    "progress": {
+        "dsa": 20,
+        "ai": 10,
+        "apti": 20,
+        "systemdesign": 5,
+        "tech": 25,
+        "core": 30
+    },
+    "logs": [
+        {
+            "id": 123456,
+            "date": "2026-06-14",
+            "category": "dsa",
+            "duration": 2.5,
+            "description": "Practice recursion",
+            "percentageIncrement": 5
+        }
+    ],
+    "events": [
+        {
+            "id": 987654,
+            "date": "2026-06-15",
+            "time": "10:00",
+            "title": "Mock Test",
+            "type": "test"
+        }
+    ],
+    "resources": [],
+    "todos": [],
+    "mockTests": [],
+    "files": []
+}
