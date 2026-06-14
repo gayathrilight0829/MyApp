@@ -1,15 +1,17 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = 'stellar_secret_key_98fd-b4d858eb9c00';
 
-// Database Directories Setup
+// Database Directories Setup (Fallback filesystem database)
 const DB_DIR = path.join(__dirname, 'db');
 const UPLOADS_DIR = path.join(DB_DIR, 'uploads');
 const DATA_FILE = path.join(DB_DIR, 'data.json');
@@ -21,15 +23,79 @@ if (!fs.existsSync(UPLOADS_DIR)) {
     fs.mkdirSync(UPLOADS_DIR);
 }
 
+// --------------------------------------------------------------------------
+// MONGODB CONNECTION SETUP
+// --------------------------------------------------------------------------
+const MONGODB_URI = process.env.MONGODB_URI;
+let mongoConnected = false;
+
+if (!MONGODB_URI || MONGODB_URI.includes('<username>')) {
+    console.warn("WARNING: MONGODB_URI is not configured in .env or contains placeholder credentials.");
+    console.warn("Falling back to local db/data.json file database.");
+} else {
+    mongoose.connect(MONGODB_URI)
+        .then(() => {
+            console.log("MongoDB Atlas database connected successfully.");
+            mongoConnected = true;
+        })
+        .catch(err => {
+            console.error("MongoDB Atlas connection error:", err.message);
+            console.warn("Falling back to local db/data.json file database.");
+        });
+}
+
+// Mongoose Database Schema & Model
+const studyStateSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    progress: {
+        dsa: { type: Number, default: 0 },
+        ai: { type: Number, default: 0 },
+        apti: { type: Number, default: 0 },
+        systemdesign: { type: Number, default: 0 },
+        tech: { type: Number, default: 0 },
+        core: { type: Number, default: 0 }
+    },
+    logs: { type: Array, default: [] },
+    events: { type: Array, default: [] },
+    resources: { type: Array, default: [] },
+    todos: { type: Array, default: [] },
+    mockTests: { type: Array, default: [] },
+    files: { type: Array, default: [] }
+});
+
+const StudyState = mongoose.model('StudyState', studyStateSchema);
+
 // Default Starting Database Structure
 const DEFAULT_DB = {
     progress: { dsa: 15, ai: 10, apti: 20, systemdesign: 5, tech: 25, core: 30 },
-    logs: [ ],
-    events: [ ],
-    resources: [],
-    todos: [],
-    mockTests: [],
-    files: [] // Holds files metadata on server
+    logs: [
+        { id: 1, date: getOffsetDateString(0), category: "dsa", duration: 2.5, description: "Solved 3 Medium Binary Tree problems on DFS.", percentageIncrement: 5 },
+        { id: 2, date: getOffsetDateString(-1), category: "ai", duration: 3, description: "Studied Backpropagation algorithm and coded simple Neural Network layer.", percentageIncrement: 10 },
+        { id: 3, date: getOffsetDateString(-2), category: "systemdesign", duration: 1.5, description: "Reviewed Key-Value store architectures and Consistency models.", percentageIncrement: 5 },
+        { id: 4, date: getOffsetDateString(-3), category: "dsa", duration: 3.5, description: "Practiced sliding window algorithms and key Array patterns.", percentageIncrement: 10 },
+        { id: 5, date: getOffsetDateString(-4), category: "apti", duration: 2, description: "Solved 15 Quantitative Reasoning questions on Work & Time.", percentageIncrement: 20 },
+        { id: 6, date: getOffsetDateString(-5), category: "tech", duration: 4, description: "Finished reading Next.js App Router and Server Components docs.", percentageIncrement: 25 },
+        { id: 7, date: getOffsetDateString(-6), category: "core", duration: 3, description: "Reviewed OS CPU scheduling algorithms and Semaphores.", percentageIncrement: 30 }
+    ],
+    events: [
+        { id: 1, date: getOffsetDateString(1), time: "14:00", title: "DSA Contest Practice", type: "test" },
+        { id: 2, date: getOffsetDateString(3), time: "09:00", title: "System Design Milestone Study", type: "milestone" },
+        { id: 3, date: getOffsetDateString(5), time: "23:59", title: "Aptitude Section Test Deadline", type: "deadline" }
+    ],
+    resources: [
+        { id: 1, name: "NeetCode 150 Map", category: "dsa", url: "https://neetcode.io/practice" },
+        { id: 2, name: "CS229 Stanford AI", category: "ai", url: "https://cs229.stanford.edu" },
+        { id: 3, name: "System Design Primer", category: "systemdesign", url: "https://github.com/donnemartin/system-design-primer" }
+    ],
+    todos: [
+        { id: 1, text: "Finish Binary Tree Traversals", priority: "high", completed: false },
+        { id: 2, text: "Watch Transformer Networks video", priority: "medium", completed: true },
+        { id: 3, text: "Solve 10 Aptitude Logical Reasoning Qs", priority: "low", completed: false }
+    ],
+    mockTests: [
+        { id: 1, date: getOffsetDateString(-3), title: "DSA Trees Mock Test 1", category: "dsa", problemsSolved: 3, problemsTotal: 4, duration: 45, score: 75 }
+    ],
+    files: []
 };
 
 function getOffsetDateString(daysOffset) {
@@ -38,7 +104,15 @@ function getOffsetDateString(daysOffset) {
     return d.toISOString().split("T")[0];
 }
 
-// Database Helpers
+// --------------------------------------------------------------------------
+// DATABASE PORTABILITY HELPERS
+// --------------------------------------------------------------------------
+
+function isMongoConnected() {
+    return mongoose.connection.readyState === 1;
+}
+
+// Read local file fallback
 function readDatabase() {
     if (!fs.existsSync(DATA_FILE)) {
         writeDatabase(DEFAULT_DB);
@@ -53,6 +127,7 @@ function readDatabase() {
     }
 }
 
+// Write local file fallback atomically
 function writeDatabase(data) {
     try {
         const tempFile = DATA_FILE + '.tmp';
@@ -65,14 +140,53 @@ function writeDatabase(data) {
     }
 }
 
-// Middleware Configuration
+// Unified Async read state helper
+async function getUserState(username) {
+    if (isMongoConnected()) {
+        try {
+            let doc = await StudyState.findOne({ username });
+            if (!doc) {
+                doc = new StudyState({ username, ...DEFAULT_DB });
+                await doc.save();
+            }
+            return doc;
+        } catch (e) {
+            console.error("MongoDB read error, falling back to local file", e);
+        }
+    }
+    return readDatabase();
+}
+
+// Unified Async write state helper
+async function saveUserState(username, updatedFields) {
+    if (isMongoConnected()) {
+        try {
+            const doc = await StudyState.findOneAndUpdate(
+                { username },
+                { $set: updatedFields },
+                { new: true, upsert: true }
+            );
+            return doc;
+        } catch (e) {
+            console.error("MongoDB write error, falling back to local file write", e);
+        }
+    }
+    const db = readDatabase();
+    Object.assign(db, updatedFields);
+    writeDatabase(db);
+    return db;
+}
+
+// --------------------------------------------------------------------------
+// MIDDLEWARE CONFIGURATION
+// --------------------------------------------------------------------------
 app.use(cors());
 app.use(express.json());
 
 // Serve static frontend assets
 app.use(express.static(path.join(__dirname)));
 
-// Multer Storage Configuration for File Vault uploads
+// Multer Storage Configuration
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, UPLOADS_DIR);
@@ -123,40 +237,42 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Get User State Database
-app.get('/api/userdata', authenticateToken, (req, res) => {
-    const db = readDatabase();
-    res.json(db);
+app.get('/api/userdata', authenticateToken, async (req, res) => {
+    try {
+        const db = await getUserState(req.user.username);
+        res.json(db);
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to retrieve user database' });
+    }
 });
 
 // Update/Sync Full Database state
-app.post('/api/sync', authenticateToken, (req, res) => {
-    const db = readDatabase();
+app.post('/api/sync', authenticateToken, async (req, res) => {
     const updatedState = req.body;
+    const updateData = {
+        progress: updatedState.progress,
+        logs: updatedState.logs,
+        events: updatedState.events,
+        resources: updatedState.resources,
+        todos: updatedState.todos,
+        mockTests: updatedState.mockTests
+    };
 
-    // Merge incoming state details safely, preserving uploaded files database
-    db.progress = updatedState.progress || db.progress;
-    db.logs = updatedState.logs || db.logs;
-    db.events = updatedState.events || db.events;
-    db.resources = updatedState.resources || db.resources;
-    db.todos = updatedState.todos || db.todos;
-    db.mockTests = updatedState.mockTests || db.mockTests;
-
-    if (writeDatabase(db)) {
-        return res.json({ success: true, message: 'Sync complete' });
+    try {
+        await saveUserState(req.user.username, updateData);
+        res.json({ success: true, message: 'Sync complete' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to write synced state to database' });
     }
-    return res.status(500).json({ error: 'Failed to write synced state to server database' });
 });
 
 // File Management Endpoints
 
 // 1. Upload File
-app.post('/api/files/upload', authenticateToken, upload.single('file'), (req, res) => {
+app.post('/api/files/upload', authenticateToken, upload.single('file'), async (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
-
-    const db = readDatabase();
-    if (!db.files) db.files = [];
 
     const fileMeta = {
         id: Date.now() + "_" + Math.floor(Math.random() * 1000),
@@ -167,18 +283,37 @@ app.post('/api/files/upload', authenticateToken, upload.single('file'), (req, re
         uploadedAt: new Date().toISOString().split("T")[0]
     };
 
-    db.files.push(fileMeta);
-    writeDatabase(db);
-
-    res.json({ success: true, file: fileMeta });
+    try {
+        const db = await getUserState(req.user.username);
+        const files = db.files || [];
+        files.push(fileMeta);
+        await saveUserState(req.user.username, { files });
+        res.json({ success: true, file: fileMeta });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to save file metadata' });
+    }
 });
 
 // 2. Download File
-app.get('/api/files/download/:id', (req, res) => {
-    // Note: We bypass token check on simple link downloads for anchor tags, 
-    // but check file presence via metadata
-    const db = readDatabase();
-    const file = db.files.find(f => f.id === req.params.id);
+app.get('/api/files/download/:id', async (req, res) => {
+    let file = null;
+    
+    if (isMongoConnected()) {
+        try {
+            const doc = await StudyState.findOne({ "files.id": req.params.id }, { files: 1 });
+            if (doc && doc.files) {
+                file = doc.files.find(f => f.id === req.params.id);
+            }
+        } catch (e) {
+            console.error("MongoDB file download look up error", e);
+        }
+    }
+
+    if (!file) {
+        // Fallback file lookup
+        const db = readDatabase();
+        file = db.files.find(f => f.id === req.params.id);
+    }
 
     if (!file) {
         return res.status(404).send('Document not found in vault registry');
@@ -193,31 +328,36 @@ app.get('/api/files/download/:id', (req, res) => {
 });
 
 // 3. Delete File
-app.delete('/api/files/:id', authenticateToken, (req, res) => {
-    const db = readDatabase();
-    const fileIndex = db.files.findIndex(f => f.id === req.params.id);
+app.delete('/api/files/:id', authenticateToken, async (req, res) => {
+    try {
+        const db = await getUserState(req.user.username);
+        const fileIndex = db.files.findIndex(f => f.id === req.params.id);
 
-    if (fileIndex === -1) {
-        return res.status(404).json({ error: 'Document not found' });
-    }
-
-    const file = db.files[fileIndex];
-    const filePath = path.join(UPLOADS_DIR, file.filename);
-
-    // Delete file from disk
-    if (fs.existsSync(filePath)) {
-        try {
-            fs.unlinkSync(filePath);
-        } catch (e) {
-            console.error("Failed to delete physical file from disk", e);
+        if (fileIndex === -1) {
+            return res.status(404).json({ error: 'Document not found' });
         }
+
+        const file = db.files[fileIndex];
+        const filePath = path.join(UPLOADS_DIR, file.filename);
+
+        // Delete file from disk
+        if (fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+            } catch (e) {
+                console.error("Failed to delete physical file from disk", e);
+            }
+        }
+
+        // Delete metadata from list
+        const files = db.files;
+        files.splice(fileIndex, 1);
+        await saveUserState(req.user.username, { files });
+
+        res.json({ success: true, message: 'File deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to delete file' });
     }
-
-    // Delete metadata
-    db.files.splice(fileIndex, 1);
-    writeDatabase(db);
-
-    res.json({ success: true, message: 'File deleted successfully' });
 });
 
 // Catch-all route to serve SPA
